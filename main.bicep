@@ -445,7 +445,7 @@ module diagnostics 'diagnostics.bicep' = {
         { name: 'aiappVnet', resourceId: networking.outputs.aiappVnetId }
         { name: 'aiSearch', resourceId: foundryDeps.outputs.aiSearchID }
         { name: 'cosmosDB', resourceId: foundryDeps.outputs.cosmosDBId }
-        { name: 'storage', resourceId: foundryDeps.outputs.azureStorageId }
+        { name: 'storage', resourceId: foundryDeps.outputs.azureStorageId, skipLogs: true }
         { name: 'aiAccount', resourceId: foundry.outputs.accountID }
       ],
       #disable-next-line BCP318

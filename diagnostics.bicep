@@ -121,7 +121,7 @@ resource diagFanOut 'Microsoft.Resources/deployments@2022-09-01' = [for target i
           properties: {
             workspaceId: law.id
             storageAccountId: diagStorage.id
-            logs: [
+            logs: contains(target, 'skipLogs') && target.skipLogs ? [] : [
               {
                 categoryGroup: 'allLogs'
                 enabled: true

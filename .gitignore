@@ -29,3 +29,4 @@ __pycache__/
 venv/
 .env
 local.settings.json
+local.bicepparam

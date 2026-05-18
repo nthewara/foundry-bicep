@@ -1,0 +1,170 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.43.8.12551",
+      "templateHash": "529442986561853088"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure region for the VM resources."
+      }
+    },
+    "prefix": {
+      "type": "string",
+      "metadata": {
+        "description": "Naming prefix used for all resources (e.g. aifoundrybicep)."
+      }
+    },
+    "randomSuffix": {
+      "type": "string",
+      "metadata": {
+        "description": "Random suffix appended to resource names for uniqueness."
+      }
+    },
+    "vmSubnetId": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource ID of the subnet the jump-box NIC will attach to."
+      }
+    },
+    "vmSize": {
+      "type": "string",
+      "defaultValue": "Standard_D8s_v5",
+      "metadata": {
+        "description": "VM size. Default is Standard_D8s_v5 (8 vCPU / 32 GB RAM) — capable of running VS2026 + AI workloads."
+      }
+    },
+    "adminUsername": {
+      "type": "string",
+      "defaultValue": "azureadmin",
+      "metadata": {
+        "description": "Local administrator username."
+      }
+    },
+    "adminPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Local administrator password. Wire this from Key Vault in .bicepparam."
+      }
+    },
+    "osDiskType": {
+      "type": "string",
+      "defaultValue": "Premium_LRS",
+      "allowedValues": [
+        "Standard_LRS",
+        "StandardSSD_LRS",
+        "Premium_LRS",
+        "PremiumV2_LRS",
+        "UltraSSD_LRS"
+      ],
+      "metadata": {
+        "description": "OS disk SKU. Premium_LRS by default for snappy jump-box experience."
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}-nic-winvm-{1}', parameters('prefix'), parameters('randomSuffix'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig",
+            "properties": {
+              "subnet": {
+                "id": "[parameters('vmSubnetId')]"
+              },
+              "privateIPAllocationMethod": "Dynamic"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2024-07-01",
+      "name": "[format('{0}-winvm1', parameters('prefix'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('vmSize')]"
+        },
+        "osProfile": {
+          "computerName": "jumpbox1",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]",
+          "windowsConfiguration": {
+            "provisionVMAgent": true,
+            "enableAutomaticUpdates": true,
+            "patchSettings": {
+              "patchMode": "AutomaticByPlatform"
+            }
+          }
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "MicrosoftWindowsServer",
+            "offer": "WindowsServer",
+            "sku": "2022-datacenter-azure-edition-hotpatch",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "[format('{0}-osdisk-winvm-{1}', parameters('prefix'), parameters('randomSuffix'))]",
+            "createOption": "FromImage",
+            "caching": "ReadWrite",
+            "managedDisk": {
+              "storageAccountType": "[parameters('osDiskType')]"
+            }
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', format('{0}-nic-winvm-{1}', parameters('prefix'), parameters('randomSuffix')))]"
+            }
+          ]
+        },
+        "licenseType": "Windows_Server",
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": true
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkInterfaces', format('{0}-nic-winvm-{1}', parameters('prefix'), parameters('randomSuffix')))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "vmId": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource ID of the jump-box VM."
+      },
+      "value": "[resourceId('Microsoft.Compute/virtualMachines', format('{0}-winvm1', parameters('prefix')))]"
+    },
+    "vmName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the jump-box VM."
+      },
+      "value": "[format('{0}-winvm1', parameters('prefix'))]"
+    },
+    "vmPrivateIp": {
+      "type": "string",
+      "metadata": {
+        "description": "Private IP address of the jump-box NIC."
+      },
+      "value": "[reference(resourceId('Microsoft.Network/networkInterfaces', format('{0}-nic-winvm-{1}', parameters('prefix'), parameters('randomSuffix'))), '2024-05-01').ipConfigurations[0].properties.privateIPAddress]"
+    }
+  }
+}
