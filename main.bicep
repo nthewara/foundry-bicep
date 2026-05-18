@@ -443,7 +443,7 @@ module diagnostics 'diagnostics.bicep' = {
         { name: 'hubVnet', resourceId: networking.outputs.hubVnetId }
         { name: 'vmVnet', resourceId: networking.outputs.vmVnetId }
         { name: 'aiappVnet', resourceId: networking.outputs.aiappVnetId }
-        { name: 'aiSearch', resourceId: resourceId(rg.name, 'Microsoft.Search/searchServices', foundryDeps.outputs.aiSearchName) }
+        { name: 'aiSearch', resourceId: foundryDeps.outputs.aiSearchID }
         { name: 'cosmosDB', resourceId: foundryDeps.outputs.cosmosDBId }
         { name: 'storage', resourceId: foundryDeps.outputs.azureStorageId }
         { name: 'aiAccount', resourceId: foundry.outputs.accountID }
