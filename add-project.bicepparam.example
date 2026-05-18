@@ -1,0 +1,40 @@
+// add-project.bicepparam.example
+// Sanitised example for add-project.bicep. Copy to
+// ~/workspace/tfvars/foundry-bicep-add-project.bicepparam (or wherever you
+// keep tfvars-style secrets outside the repo), fill in real values, and
+// deploy with:
+//   az deployment group create -g <rg> \
+//     --template-file add-project.bicep \
+//     --parameters ~/workspace/tfvars/foundry-bicep-add-project.bicepparam
+//
+// All values below are placeholders.
+
+using 'add-project.bicep'
+
+param location = 'australiaeast'
+
+// Existing AI Foundry account
+param existingAccountName = '<aiservices-account-name>'
+param accountResourceGroupName = '<rg-with-foundry>'
+param accountSubscriptionId = '<subscription-guid>'
+
+// New project
+param projectName = 'project2'
+param projectDescription = 'Second AI Foundry project sharing the same account'
+param displayName = 'project2 (dev)'
+param projectCapHost = 'caphostproj'
+
+// Existing AI Search
+param existingAiSearchName = '<aisearch-name>'
+param aiSearchResourceGroupName = '<rg-with-foundry>'
+param aiSearchSubscriptionId = '<subscription-guid>'
+
+// Existing Storage Account
+param existingStorageName = '<storage-account-name>'
+param storageResourceGroupName = '<rg-with-foundry>'
+param storageSubscriptionId = '<subscription-guid>'
+
+// Existing Cosmos DB
+param existingCosmosDBName = '<cosmosdb-account-name>'
+param cosmosDBResourceGroupName = '<rg-with-foundry>'
+param cosmosDBSubscriptionId = '<subscription-guid>'
