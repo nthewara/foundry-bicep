@@ -1,0 +1,937 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "dashboardName": {
+      "type": "string",
+      "defaultValue": "AI-Foundry-Operations-Dashboard"
+    }
+  },
+  "variables": {
+    "subscriptionId": "[subscription().subscriptionId]",
+    "resourceGroup": "<resource-group>",
+    "lawId": "[concat('/subscriptions/', variables('subscriptionId'), '/resourceGroups/', variables('resourceGroup'), '/providers/Microsoft.OperationalInsights/workspaces/<law-name>')]",
+    "aiFoundryId": "[concat('/subscriptions/', variables('subscriptionId'), '/resourceGroups/', variables('resourceGroup'), '/providers/Microsoft.CognitiveServices/accounts/<foundry-name>')]",
+    "firewallId": "[concat('/subscriptions/', variables('subscriptionId'), '/resourceGroups/', variables('resourceGroup'), '/providers/Microsoft.Network/azureFirewalls/<firewall-name>')]",
+    "cosmosDbId": "[concat('/subscriptions/', variables('subscriptionId'), '/resourceGroups/', variables('resourceGroup'), '/providers/Microsoft.DocumentDB/databaseAccounts/<foundry-name>cosmosdb')]",
+    "aiSearchId": "[concat('/subscriptions/', variables('subscriptionId'), '/resourceGroups/', variables('resourceGroup'), '/providers/Microsoft.Search/searchServices/<foundry-name>search')]",
+    "storageId": "[concat('/subscriptions/', variables('subscriptionId'), '/resourceGroups/', variables('resourceGroup'), '/providers/Microsoft.Storage/storageAccounts/<foundry-name>storage')]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Portal/dashboards",
+      "apiVersion": "2020-09-01-preview",
+      "name": "[parameters('dashboardName')]",
+      "location": "australiaeast",
+      "tags": {
+        "hidden-title": "Microsoft Foundry BYOV Operations",
+        "environment": "production",
+        "platform": "ai-foundry"
+      },
+      "properties": {
+        "lenses": [
+          {
+            "order": 0,
+            "parts": [
+              {
+                "position": { "x": 0, "y": 0, "rowSpan": 2, "colSpan": 6 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MarkdownPart",
+                  "inputs": [],
+                  "settings": {
+                    "content": {
+                      "settings": {
+                        "content": "# 🤖 Microsoft Foundry BYOV Operations Dashboard\n\n**Resource Group:** `<resource-group>` | **Region:** Australia East | **Architecture:** Hub-Spoke with Azure Firewall\n\n---",
+                        "title": "",
+                        "subtitle": "",
+                        "markdownSource": 1
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "position": { "x": 6, "y": 0, "rowSpan": 2, "colSpan": 4 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MarkdownPart",
+                  "inputs": [],
+                  "settings": {
+                    "content": {
+                      "settings": {
+                        "content": "### 🔗 Quick Links\n\n| Resource | Link |\n|----------|------|\n| [Microsoft Foundry](https://portal.azure.com/#@/resource/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.CognitiveServices/accounts/<foundry-name>) | Cognitive Services |\n| [Firewall](https://portal.azure.com/#@/resource/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.Network/azureFirewalls/<firewall-name>) | Network Security |\n| [Log Analytics](https://portal.azure.com/#@/resource/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.OperationalInsights/workspaces/<law-name>) | Logs & Queries |",
+                        "title": "",
+                        "subtitle": "",
+                        "markdownSource": 1
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "position": { "x": 10, "y": 0, "rowSpan": 2, "colSpan": 2 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/ClockPart",
+                  "inputs": [],
+                  "settings": {
+                    "content": {
+                      "settings": {
+                        "timezoneId": "W. Australia Standard Time",
+                        "timeFormat": "HH:mm",
+                        "version": 1
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "position": { "x": 0, "y": 2, "rowSpan": 1, "colSpan": 12 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MarkdownPart",
+                  "inputs": [],
+                  "settings": {
+                    "content": {
+                      "settings": {
+                        "content": "## 🧠 Microsoft Foundry / Cognitive Services Metrics",
+                        "title": "",
+                        "subtitle": "",
+                        "markdownSource": 1
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "position": { "x": 0, "y": 3, "rowSpan": 4, "colSpan": 4 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MonitorChartPart",
+                  "inputs": [
+                    {
+                      "name": "sharedTimeRange",
+                      "isOptional": true
+                    },
+                    {
+                      "name": "options",
+                      "value": {
+                        "chart": {
+                          "metrics": [
+                            {
+                              "resourceMetadata": {
+                                "id": "[variables('aiFoundryId')]"
+                              },
+                              "name": "TotalCalls",
+                              "aggregationType": 1,
+                              "namespace": "microsoft.cognitiveservices/accounts",
+                              "metricVisualization": {
+                                "displayName": "Total Calls",
+                                "resourceDisplayName": "Microsoft Foundry"
+                              }
+                            }
+                          ],
+                          "title": "Microsoft Foundry - Total API Calls",
+                          "titleKind": 1,
+                          "visualization": {
+                            "chartType": 2,
+                            "legendVisualization": {
+                              "isVisible": true,
+                              "position": 2
+                            },
+                            "axisVisualization": {
+                              "x": { "isVisible": true },
+                              "y": { "isVisible": true }
+                            }
+                          },
+                          "timespan": {
+                            "relative": { "duration": 86400000 }
+                          }
+                        }
+                      },
+                      "isOptional": true
+                    }
+                  ],
+                  "settings": {}
+                }
+              },
+              {
+                "position": { "x": 4, "y": 3, "rowSpan": 4, "colSpan": 4 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MonitorChartPart",
+                  "inputs": [
+                    {
+                      "name": "sharedTimeRange",
+                      "isOptional": true
+                    },
+                    {
+                      "name": "options",
+                      "value": {
+                        "chart": {
+                          "metrics": [
+                            {
+                              "resourceMetadata": {
+                                "id": "[variables('aiFoundryId')]"
+                              },
+                              "name": "SuccessfulCalls",
+                              "aggregationType": 1,
+                              "namespace": "microsoft.cognitiveservices/accounts",
+                              "metricVisualization": {
+                                "displayName": "Successful Calls",
+                                "resourceDisplayName": "Microsoft Foundry",
+                                "color": "#47B17D"
+                              }
+                            },
+                            {
+                              "resourceMetadata": {
+                                "id": "[variables('aiFoundryId')]"
+                              },
+                              "name": "ClientErrors",
+                              "aggregationType": 1,
+                              "namespace": "microsoft.cognitiveservices/accounts",
+                              "metricVisualization": {
+                                "displayName": "Client Errors (4xx)",
+                                "resourceDisplayName": "Microsoft Foundry",
+                                "color": "#F7A42E"
+                              }
+                            },
+                            {
+                              "resourceMetadata": {
+                                "id": "[variables('aiFoundryId')]"
+                              },
+                              "name": "ServerErrors",
+                              "aggregationType": 1,
+                              "namespace": "microsoft.cognitiveservices/accounts",
+                              "metricVisualization": {
+                                "displayName": "Server Errors (5xx)",
+                                "resourceDisplayName": "Microsoft Foundry",
+                                "color": "#E84855"
+                              }
+                            }
+                          ],
+                          "title": "Microsoft Foundry - Success vs Errors",
+                          "titleKind": 1,
+                          "visualization": {
+                            "chartType": 2,
+                            "legendVisualization": {
+                              "isVisible": true,
+                              "position": 2
+                            }
+                          },
+                          "timespan": {
+                            "relative": { "duration": 86400000 }
+                          }
+                        }
+                      },
+                      "isOptional": true
+                    }
+                  ],
+                  "settings": {}
+                }
+              },
+              {
+                "position": { "x": 8, "y": 3, "rowSpan": 4, "colSpan": 4 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MonitorChartPart",
+                  "inputs": [
+                    {
+                      "name": "sharedTimeRange",
+                      "isOptional": true
+                    },
+                    {
+                      "name": "options",
+                      "value": {
+                        "chart": {
+                          "metrics": [
+                            {
+                              "resourceMetadata": {
+                                "id": "[variables('aiFoundryId')]"
+                              },
+                              "name": "Latency",
+                              "aggregationType": 4,
+                              "namespace": "microsoft.cognitiveservices/accounts",
+                              "metricVisualization": {
+                                "displayName": "Latency (Avg)",
+                                "resourceDisplayName": "Microsoft Foundry"
+                              }
+                            }
+                          ],
+                          "title": "Microsoft Foundry - API Latency (ms)",
+                          "titleKind": 1,
+                          "visualization": {
+                            "chartType": 2
+                          },
+                          "timespan": {
+                            "relative": { "duration": 86400000 }
+                          }
+                        }
+                      },
+                      "isOptional": true
+                    }
+                  ],
+                  "settings": {}
+                }
+              },
+              {
+                "position": { "x": 0, "y": 7, "rowSpan": 4, "colSpan": 6 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MonitorChartPart",
+                  "inputs": [
+                    {
+                      "name": "sharedTimeRange",
+                      "isOptional": true
+                    },
+                    {
+                      "name": "options",
+                      "value": {
+                        "chart": {
+                          "metrics": [
+                            {
+                              "resourceMetadata": {
+                                "id": "[variables('aiFoundryId')]"
+                              },
+                              "name": "TokenTransaction",
+                              "aggregationType": 1,
+                              "namespace": "microsoft.cognitiveservices/accounts",
+                              "metricVisualization": {
+                                "displayName": "Token Transactions",
+                                "resourceDisplayName": "Microsoft Foundry"
+                              }
+                            }
+                          ],
+                          "title": "Microsoft Foundry - Token Usage",
+                          "titleKind": 1,
+                          "visualization": {
+                            "chartType": 2
+                          },
+                          "timespan": {
+                            "relative": { "duration": 86400000 }
+                          }
+                        }
+                      },
+                      "isOptional": true
+                    }
+                  ],
+                  "settings": {}
+                }
+              },
+              {
+                "position": { "x": 6, "y": 7, "rowSpan": 4, "colSpan": 6 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MonitorChartPart",
+                  "inputs": [
+                    {
+                      "name": "sharedTimeRange",
+                      "isOptional": true
+                    },
+                    {
+                      "name": "options",
+                      "value": {
+                        "chart": {
+                          "metrics": [
+                            {
+                              "resourceMetadata": {
+                                "id": "[variables('aiFoundryId')]"
+                              },
+                              "name": "ProcessedPromptTokens",
+                              "aggregationType": 1,
+                              "namespace": "microsoft.cognitiveservices/accounts",
+                              "metricVisualization": {
+                                "displayName": "Prompt Tokens",
+                                "resourceDisplayName": "Microsoft Foundry",
+                                "color": "#0078D4"
+                              }
+                            },
+                            {
+                              "resourceMetadata": {
+                                "id": "[variables('aiFoundryId')]"
+                              },
+                              "name": "GeneratedTokens",
+                              "aggregationType": 1,
+                              "namespace": "microsoft.cognitiveservices/accounts",
+                              "metricVisualization": {
+                                "displayName": "Generated Tokens",
+                                "resourceDisplayName": "Microsoft Foundry",
+                                "color": "#47B17D"
+                              }
+                            }
+                          ],
+                          "title": "Microsoft Foundry - Prompt vs Generated Tokens",
+                          "titleKind": 1,
+                          "visualization": {
+                            "chartType": 2,
+                            "legendVisualization": {
+                              "isVisible": true,
+                              "position": 2
+                            }
+                          },
+                          "timespan": {
+                            "relative": { "duration": 86400000 }
+                          }
+                        }
+                      },
+                      "isOptional": true
+                    }
+                  ],
+                  "settings": {}
+                }
+              },
+              {
+                "position": { "x": 0, "y": 11, "rowSpan": 1, "colSpan": 12 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MarkdownPart",
+                  "inputs": [],
+                  "settings": {
+                    "content": {
+                      "settings": {
+                        "content": "## 🔥 Azure Firewall Security Metrics",
+                        "title": "",
+                        "subtitle": "",
+                        "markdownSource": 1
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "position": { "x": 0, "y": 12, "rowSpan": 4, "colSpan": 4 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MonitorChartPart",
+                  "inputs": [
+                    {
+                      "name": "sharedTimeRange",
+                      "isOptional": true
+                    },
+                    {
+                      "name": "options",
+                      "value": {
+                        "chart": {
+                          "metrics": [
+                            {
+                              "resourceMetadata": {
+                                "id": "[variables('firewallId')]"
+                              },
+                              "name": "Throughput",
+                              "aggregationType": 4,
+                              "namespace": "microsoft.network/azurefirewalls",
+                              "metricVisualization": {
+                                "displayName": "Throughput (bps)",
+                                "resourceDisplayName": "Azure Firewall"
+                              }
+                            }
+                          ],
+                          "title": "Firewall - Network Throughput",
+                          "titleKind": 1,
+                          "visualization": {
+                            "chartType": 2
+                          },
+                          "timespan": {
+                            "relative": { "duration": 86400000 }
+                          }
+                        }
+                      },
+                      "isOptional": true
+                    }
+                  ],
+                  "settings": {}
+                }
+              },
+              {
+                "position": { "x": 4, "y": 12, "rowSpan": 4, "colSpan": 4 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MonitorChartPart",
+                  "inputs": [
+                    {
+                      "name": "sharedTimeRange",
+                      "isOptional": true
+                    },
+                    {
+                      "name": "options",
+                      "value": {
+                        "chart": {
+                          "metrics": [
+                            {
+                              "resourceMetadata": {
+                                "id": "[variables('firewallId')]"
+                              },
+                              "name": "ApplicationRuleHit",
+                              "aggregationType": 1,
+                              "namespace": "microsoft.network/azurefirewalls",
+                              "metricVisualization": {
+                                "displayName": "App Rule Hits",
+                                "resourceDisplayName": "Azure Firewall",
+                                "color": "#0078D4"
+                              }
+                            },
+                            {
+                              "resourceMetadata": {
+                                "id": "[variables('firewallId')]"
+                              },
+                              "name": "NetworkRuleHit",
+                              "aggregationType": 1,
+                              "namespace": "microsoft.network/azurefirewalls",
+                              "metricVisualization": {
+                                "displayName": "Network Rule Hits",
+                                "resourceDisplayName": "Azure Firewall",
+                                "color": "#47B17D"
+                              }
+                            }
+                          ],
+                          "title": "Firewall - Rule Hits",
+                          "titleKind": 1,
+                          "visualization": {
+                            "chartType": 2,
+                            "legendVisualization": {
+                              "isVisible": true,
+                              "position": 2
+                            }
+                          },
+                          "timespan": {
+                            "relative": { "duration": 86400000 }
+                          }
+                        }
+                      },
+                      "isOptional": true
+                    }
+                  ],
+                  "settings": {}
+                }
+              },
+              {
+                "position": { "x": 8, "y": 12, "rowSpan": 4, "colSpan": 4 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MonitorChartPart",
+                  "inputs": [
+                    {
+                      "name": "sharedTimeRange",
+                      "isOptional": true
+                    },
+                    {
+                      "name": "options",
+                      "value": {
+                        "chart": {
+                          "metrics": [
+                            {
+                              "resourceMetadata": {
+                                "id": "[variables('firewallId')]"
+                              },
+                              "name": "FirewallHealth",
+                              "aggregationType": 4,
+                              "namespace": "microsoft.network/azurefirewalls",
+                              "metricVisualization": {
+                                "displayName": "Health State (%)",
+                                "resourceDisplayName": "Azure Firewall"
+                              }
+                            }
+                          ],
+                          "title": "Firewall - Health Status",
+                          "titleKind": 1,
+                          "visualization": {
+                            "chartType": 2
+                          },
+                          "timespan": {
+                            "relative": { "duration": 86400000 }
+                          }
+                        }
+                      },
+                      "isOptional": true
+                    }
+                  ],
+                  "settings": {}
+                }
+              },
+              {
+                "position": { "x": 0, "y": 16, "rowSpan": 1, "colSpan": 12 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MarkdownPart",
+                  "inputs": [],
+                  "settings": {
+                    "content": {
+                      "settings": {
+                        "content": "## 🗄️ Data Services (CosmosDB, AI Search, Storage)",
+                        "title": "",
+                        "subtitle": "",
+                        "markdownSource": 1
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "position": { "x": 0, "y": 17, "rowSpan": 4, "colSpan": 4 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MonitorChartPart",
+                  "inputs": [
+                    {
+                      "name": "sharedTimeRange",
+                      "isOptional": true
+                    },
+                    {
+                      "name": "options",
+                      "value": {
+                        "chart": {
+                          "metrics": [
+                            {
+                              "resourceMetadata": {
+                                "id": "[variables('cosmosDbId')]"
+                              },
+                              "name": "TotalRequests",
+                              "aggregationType": 1,
+                              "namespace": "microsoft.documentdb/databaseaccounts",
+                              "metricVisualization": {
+                                "displayName": "Total Requests",
+                                "resourceDisplayName": "CosmosDB"
+                              }
+                            }
+                          ],
+                          "title": "CosmosDB - Total Requests",
+                          "titleKind": 1,
+                          "visualization": {
+                            "chartType": 2
+                          },
+                          "timespan": {
+                            "relative": { "duration": 86400000 }
+                          }
+                        }
+                      },
+                      "isOptional": true
+                    }
+                  ],
+                  "settings": {}
+                }
+              },
+              {
+                "position": { "x": 4, "y": 17, "rowSpan": 4, "colSpan": 4 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MonitorChartPart",
+                  "inputs": [
+                    {
+                      "name": "sharedTimeRange",
+                      "isOptional": true
+                    },
+                    {
+                      "name": "options",
+                      "value": {
+                        "chart": {
+                          "metrics": [
+                            {
+                              "resourceMetadata": {
+                                "id": "[variables('cosmosDbId')]"
+                              },
+                              "name": "TotalRequestUnits",
+                              "aggregationType": 1,
+                              "namespace": "microsoft.documentdb/databaseaccounts",
+                              "metricVisualization": {
+                                "displayName": "RU Consumption",
+                                "resourceDisplayName": "CosmosDB"
+                              }
+                            }
+                          ],
+                          "title": "CosmosDB - RU Consumption",
+                          "titleKind": 1,
+                          "visualization": {
+                            "chartType": 2
+                          },
+                          "timespan": {
+                            "relative": { "duration": 86400000 }
+                          }
+                        }
+                      },
+                      "isOptional": true
+                    }
+                  ],
+                  "settings": {}
+                }
+              },
+              {
+                "position": { "x": 8, "y": 17, "rowSpan": 4, "colSpan": 4 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MonitorChartPart",
+                  "inputs": [
+                    {
+                      "name": "sharedTimeRange",
+                      "isOptional": true
+                    },
+                    {
+                      "name": "options",
+                      "value": {
+                        "chart": {
+                          "metrics": [
+                            {
+                              "resourceMetadata": {
+                                "id": "[variables('cosmosDbId')]"
+                              },
+                              "name": "ServiceAvailability",
+                              "aggregationType": 4,
+                              "namespace": "microsoft.documentdb/databaseaccounts",
+                              "metricVisualization": {
+                                "displayName": "Availability (%)",
+                                "resourceDisplayName": "CosmosDB"
+                              }
+                            }
+                          ],
+                          "title": "CosmosDB - Availability",
+                          "titleKind": 1,
+                          "visualization": {
+                            "chartType": 2
+                          },
+                          "timespan": {
+                            "relative": { "duration": 86400000 }
+                          }
+                        }
+                      },
+                      "isOptional": true
+                    }
+                  ],
+                  "settings": {}
+                }
+              },
+              {
+                "position": { "x": 0, "y": 21, "rowSpan": 4, "colSpan": 4 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MonitorChartPart",
+                  "inputs": [
+                    {
+                      "name": "sharedTimeRange",
+                      "isOptional": true
+                    },
+                    {
+                      "name": "options",
+                      "value": {
+                        "chart": {
+                          "metrics": [
+                            {
+                              "resourceMetadata": {
+                                "id": "[variables('aiSearchId')]"
+                              },
+                              "name": "SearchQueriesPerSecond",
+                              "aggregationType": 4,
+                              "namespace": "microsoft.search/searchservices",
+                              "metricVisualization": {
+                                "displayName": "Queries/sec",
+                                "resourceDisplayName": "AI Search"
+                              }
+                            }
+                          ],
+                          "title": "AI Search - Queries per Second",
+                          "titleKind": 1,
+                          "visualization": {
+                            "chartType": 2
+                          },
+                          "timespan": {
+                            "relative": { "duration": 86400000 }
+                          }
+                        }
+                      },
+                      "isOptional": true
+                    }
+                  ],
+                  "settings": {}
+                }
+              },
+              {
+                "position": { "x": 4, "y": 21, "rowSpan": 4, "colSpan": 4 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MonitorChartPart",
+                  "inputs": [
+                    {
+                      "name": "sharedTimeRange",
+                      "isOptional": true
+                    },
+                    {
+                      "name": "options",
+                      "value": {
+                        "chart": {
+                          "metrics": [
+                            {
+                              "resourceMetadata": {
+                                "id": "[variables('aiSearchId')]"
+                              },
+                              "name": "SearchLatency",
+                              "aggregationType": 4,
+                              "namespace": "microsoft.search/searchservices",
+                              "metricVisualization": {
+                                "displayName": "Latency (ms)",
+                                "resourceDisplayName": "AI Search"
+                              }
+                            }
+                          ],
+                          "title": "AI Search - Latency",
+                          "titleKind": 1,
+                          "visualization": {
+                            "chartType": 2
+                          },
+                          "timespan": {
+                            "relative": { "duration": 86400000 }
+                          }
+                        }
+                      },
+                      "isOptional": true
+                    }
+                  ],
+                  "settings": {}
+                }
+              },
+              {
+                "position": { "x": 8, "y": 21, "rowSpan": 4, "colSpan": 4 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MonitorChartPart",
+                  "inputs": [
+                    {
+                      "name": "sharedTimeRange",
+                      "isOptional": true
+                    },
+                    {
+                      "name": "options",
+                      "value": {
+                        "chart": {
+                          "metrics": [
+                            {
+                              "resourceMetadata": {
+                                "id": "[variables('storageId')]"
+                              },
+                              "name": "UsedCapacity",
+                              "aggregationType": 4,
+                              "namespace": "microsoft.storage/storageaccounts",
+                              "metricVisualization": {
+                                "displayName": "Used Capacity",
+                                "resourceDisplayName": "Storage Account"
+                              }
+                            }
+                          ],
+                          "title": "Storage - Used Capacity",
+                          "titleKind": 1,
+                          "visualization": {
+                            "chartType": 2
+                          },
+                          "timespan": {
+                            "relative": { "duration": 86400000 }
+                          }
+                        }
+                      },
+                      "isOptional": true
+                    }
+                  ],
+                  "settings": {}
+                }
+              },
+              {
+                "position": { "x": 0, "y": 25, "rowSpan": 1, "colSpan": 12 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MarkdownPart",
+                  "inputs": [],
+                  "settings": {
+                    "content": {
+                      "settings": {
+                        "content": "## 📊 Log Analytics Quick Queries\n\nClick any link below to open the query in Log Analytics. For interactive queries, use the [Azure Workbook](https://portal.azure.com/#@/resource/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.Insights/workbooks/54072ecc-d778-5349-aef6-5de4c196c2ea/workbook).",
+                        "title": "",
+                        "subtitle": "",
+                        "markdownSource": 1
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "position": { "x": 0, "y": 26, "rowSpan": 4, "colSpan": 6 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MarkdownPart",
+                  "inputs": [],
+                  "settings": {
+                    "content": {
+                      "settings": {
+                        "content": "### 🔥 Firewall Queries\n\n| Query | Description |\n|-------|-------------|\n| [Top App Rules](https://portal.azure.com/#@/blade/Microsoft_Azure_Monitoring_Logs/LogsBlade/resourceId/%2Fsubscriptions%2F<subscription-id>%2FresourceGroups%2F<resource-group>%2Fproviders%2FMicrosoft.OperationalInsights%2Fworkspaces%2F<law-name>/source/LogsBlade.AnalyticsShareLinkToQuery/q/H4sIAAAAAAAAA0vOz0nNTQEAhDsLMgUAAAA%3D) | Most hit application rules |\n| [Blocked Traffic](https://portal.azure.com/#@/blade/Microsoft_Azure_Monitoring_Logs/LogsBlade/resourceId/%2Fsubscriptions%2F<subscription-id>%2FresourceGroups%2F<resource-group>%2Fproviders%2FMicrosoft.OperationalInsights%2Fworkspaces%2F<law-name>/source/LogsBlade.AnalyticsShareLinkToQuery/q/H4sIAAAAAAAAA0vOz0nNTQEAhDsLMgUAAAA%3D) | Denied connections |\n| [Top Destinations](https://portal.azure.com/#@/blade/Microsoft_Azure_Monitoring_Logs/LogsBlade/resourceId/%2Fsubscriptions%2F<subscription-id>%2FresourceGroups%2F<resource-group>%2Fproviders%2FMicrosoft.OperationalInsights%2Fworkspaces%2F<law-name>/source/LogsBlade.AnalyticsShareLinkToQuery/q/H4sIAAAAAAAAA0vOz0nNTQEAhDsLMgUAAAA%3D) | Most accessed FQDNs |",
+                        "title": "",
+                        "subtitle": "",
+                        "markdownSource": 1
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "position": { "x": 6, "y": 26, "rowSpan": 4, "colSpan": 6 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MarkdownPart",
+                  "inputs": [],
+                  "settings": {
+                    "content": {
+                      "settings": {
+                        "content": "### 🧠 Microsoft Foundry Queries\n\n| Query | Description |\n|-------|-------------|\n| [Operations Summary](https://portal.azure.com/#@/blade/Microsoft_Azure_Monitoring_Logs/LogsBlade/resourceId/%2Fsubscriptions%2F<subscription-id>%2FresourceGroups%2F<resource-group>%2Fproviders%2FMicrosoft.OperationalInsights%2Fworkspaces%2F<law-name>/source/LogsBlade.AnalyticsShareLinkToQuery/q/H4sIAAAAAAAAA0vOz0nNTQEAhDsLMgUAAAA%3D) | API operations by type |\n| [Errors](https://portal.azure.com/#@/blade/Microsoft_Azure_Monitoring_Logs/LogsBlade/resourceId/%2Fsubscriptions%2F<subscription-id>%2FresourceGroups%2F<resource-group>%2Fproviders%2FMicrosoft.OperationalInsights%2Fworkspaces%2F<law-name>/source/LogsBlade.AnalyticsShareLinkToQuery/q/H4sIAAAAAAAAA0vOz0nNTQEAhDsLMgUAAAA%3D) | Failed API calls |\n| [Latency Analysis](https://portal.azure.com/#@/blade/Microsoft_Azure_Monitoring_Logs/LogsBlade/resourceId/%2Fsubscriptions%2F<subscription-id>%2FresourceGroups%2F<resource-group>%2Fproviders%2FMicrosoft.OperationalInsights%2Fworkspaces%2F<law-name>/source/LogsBlade.AnalyticsShareLinkToQuery/q/H4sIAAAAAAAAA0vOz0nNTQEAhDsLMgUAAAA%3D) | Response time percentiles |",
+                        "title": "",
+                        "subtitle": "",
+                        "markdownSource": 1
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "position": { "x": 0, "y": 30, "rowSpan": 4, "colSpan": 6 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MarkdownPart",
+                  "inputs": [],
+                  "settings": {
+                    "content": {
+                      "settings": {
+                        "content": "### 🗄️ CosmosDB Queries\n\n| Query | Description |\n|-------|-------------|\n| [RU Analysis](https://portal.azure.com/#@/blade/Microsoft_Azure_Monitoring_Logs/LogsBlade/resourceId/%2Fsubscriptions%2F<subscription-id>%2FresourceGroups%2F<resource-group>%2Fproviders%2FMicrosoft.OperationalInsights%2Fworkspaces%2F<law-name>/source/LogsBlade.AnalyticsShareLinkToQuery/q/H4sIAAAAAAAAA0vOz0nNTQEAhDsLMgUAAAA%3D) | RU consumption by operation |\n| [Throttled Requests](https://portal.azure.com/#@/blade/Microsoft_Azure_Monitoring_Logs/LogsBlade/resourceId/%2Fsubscriptions%2F<subscription-id>%2FresourceGroups%2F<resource-group>%2Fproviders%2FMicrosoft.OperationalInsights%2Fworkspaces%2F<law-name>/source/LogsBlade.AnalyticsShareLinkToQuery/q/H4sIAAAAAAAAA0vOz0nNTQEAhDsLMgUAAAA%3D) | 429 rate limiting events |\n| [Slow Queries](https://portal.azure.com/#@/blade/Microsoft_Azure_Monitoring_Logs/LogsBlade/resourceId/%2Fsubscriptions%2F<subscription-id>%2FresourceGroups%2F<resource-group>%2Fproviders%2FMicrosoft.OperationalInsights%2Fworkspaces%2F<law-name>/source/LogsBlade.AnalyticsShareLinkToQuery/q/H4sIAAAAAAAAA0vOz0nNTQEAhDsLMgUAAAA%3D) | High latency operations |",
+                        "title": "",
+                        "subtitle": "",
+                        "markdownSource": 1
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "position": { "x": 6, "y": 30, "rowSpan": 4, "colSpan": 6 },
+                "metadata": {
+                  "type": "Extension/HubsExtension/PartType/MarkdownPart",
+                  "inputs": [],
+                  "settings": {
+                    "content": {
+                      "settings": {
+                        "content": "### 🌐 Network Queries\n\n| Query | Description |\n|-------|-------------|\n| [Top Flows](https://portal.azure.com/#@/blade/Microsoft_Azure_Monitoring_Logs/LogsBlade/resourceId/%2Fsubscriptions%2F<subscription-id>%2FresourceGroups%2F<resource-group>%2Fproviders%2FMicrosoft.OperationalInsights%2Fworkspaces%2F<law-name>/source/LogsBlade.AnalyticsShareLinkToQuery/q/H4sIAAAAAAAAA0vOz0nNTQEAhDsLMgUAAAA%3D) | Highest bandwidth flows |\n| [Denied Flows](https://portal.azure.com/#@/blade/Microsoft_Azure_Monitoring_Logs/LogsBlade/resourceId/%2Fsubscriptions%2F<subscription-id>%2FresourceGroups%2F<resource-group>%2Fproviders%2FMicrosoft.OperationalInsights%2Fworkspaces%2F<law-name>/source/LogsBlade.AnalyticsShareLinkToQuery/q/H4sIAAAAAAAAA0vOz0nNTQEAhDsLMgUAAAA%3D) | NSG blocked connections |\n| [Cross-VNet Traffic](https://portal.azure.com/#@/blade/Microsoft_Azure_Monitoring_Logs/LogsBlade/resourceId/%2Fsubscriptions%2F<subscription-id>%2FresourceGroups%2F<resource-group>%2Fproviders%2FMicrosoft.OperationalInsights%2Fworkspaces%2F<law-name>/source/LogsBlade.AnalyticsShareLinkToQuery/q/H4sIAAAAAAAAA0vOz0nNTQEAhDsLMgUAAAA%3D) | Hub-spoke traffic analysis |",
+                        "title": "",
+                        "subtitle": "",
+                        "markdownSource": 1
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "model": {
+            "timeRange": {
+              "value": {
+                "relative": {
+                  "duration": 24,
+                  "timeUnit": 1
+                }
+              },
+              "type": "MsPortalFx.Composition.Configuration.ValueTypes.TimeRange"
+            },
+            "filterLocale": {
+              "value": "en-us"
+            },
+            "filters": {
+              "value": {
+                "MsPortalFx_TimeRange": {
+                  "model": {
+                    "format": "local",
+                    "granularity": "auto",
+                    "relative": "24h"
+                  },
+                  "displayCache": {
+                    "name": "Local Time",
+                    "value": "Past 24 hours"
+                  },
+                  "filteredPartIds": []
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
