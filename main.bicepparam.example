@@ -1,0 +1,75 @@
+// =============================================================================
+// main.bicepparam.example
+// Copy to ~/workspace/tfvars/foundry-bicep.bicepparam (gitignored) and fill in.
+//
+// Deploy:
+//   az deployment sub create \
+//     --location australiaeast \
+//     --template-file main.bicep \
+//     --parameters ~/workspace/tfvars/foundry-bicep.bicepparam
+// =============================================================================
+
+using './main.bicep'
+
+// ----- General -----
+param location = 'australiaeast'
+param prefix = 'aifoundrybicep'
+// Leave blank to auto-derive from the subscription + RG name. Set explicitly
+// if you want predictable names across re-deploys.
+param randomSuffix = ''
+// resourceGroupName defaults to '<prefix>-<suffix>'. Override if you have a
+// naming convention.
+// param resourceGroupName = 'rg-foundrybicep-lab'
+
+param tags = {
+  lab: 'foundry-bicep'
+  managedBy: 'bicep'
+  owner: 'nthewara'
+  costCenter: 'lab'
+}
+
+// ----- Networking -----
+param hubVnetPrefix = '10.100.0.0/23'
+param vmVnetPrefix = '10.10.10.0/23'
+param aiappVnetPrefix = '10.10.20.0/23'
+
+// ----- Toggles -----
+param fwProvision = true
+param fwSku = 'Basic'
+param bastionProvision = true
+param vmDeploy = true
+
+// ----- VM -----
+param vmSize = 'Standard_D8s_v5'
+param adminUsername = 'azureadmin'
+
+// Wire the password from your existing Key Vault.
+// Update the KV resource ID below to match your environment.
+param adminPassword = az.getSecret(
+  /* subscriptionId */ 'b9d87a00-a4d8-47d9-84a2-cfd7a9d745d2',
+  /* resourceGroup  */ 'Management',
+  /* keyVaultName   */ 'USAZE-MSFTINT-PRD-KVLT03',
+  /* secretName     */ 'foundrybicep-admin-password'
+)
+
+// ----- DNS -----
+// Default 6-zone set is fine for the standard Foundry private-link footprint.
+// Override here if you need to add Fabric or App Configuration zones.
+// param privateDnsZones = [ ... ]
+
+// ----- Foundry / model -----
+param aiServicesNameBase = 'aiservices'
+param aiSearchNameBase = 'aisearch'
+param cosmosDBNameBase = 'cosmosdb'
+param azureStorageNameBase = 'foundrystg'
+
+param projectName = 'project'
+param projectDescription = 'A project for the AI Foundry account with network secured deployed Agent'
+param projectDisplayName = 'network secured agent project'
+param projectCapHostName = 'caphostproj'
+
+param modelName = 'gpt-4o-mini'
+param modelFormat = 'OpenAI'
+param modelVersion = '2024-07-18'
+param modelSkuName = 'GlobalStandard'
+param modelCapacity = 30
