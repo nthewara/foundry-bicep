@@ -94,54 +94,33 @@ resource diagStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
 // work but this phase intentionally keeps the module surface to three files.
 // -----------------------------------------------------------------------------
 
+// NOTE: We intentionally use expressionEvaluationOptions.scope = 'outer' so
+// that target.resourceId / target.name (loop-bound values) and law.id /
+// diagStorage.id are evaluated in the OUTER template context and baked into
+// the inner template as literals. ARM does not evaluate parameter()
+// expressions inside a resource's `scope` property at inner-template
+// validation time, which causes InvalidResourceNamespace when scope is
+// '[parameters(...)]'. Baking the resourceId in as a literal sidesteps that.
 #disable-next-line no-deployments-resources
 resource diagFanOut 'Microsoft.Resources/deployments@2022-09-01' = [for target in targets: {
   name: 'diag-${target.name}'
   properties: {
     mode: 'Incremental'
     expressionEvaluationOptions: {
-      scope: 'inner'
-    }
-    parameters: {
-      settingName: {
-        value: '${target.name}-diag'
-      }
-      targetResourceId: {
-        value: target.resourceId
-      }
-      workspaceId: {
-        value: law.id
-      }
-      storageAccountId: {
-        value: diagStorage.id
-      }
+      scope: 'outer'
     }
     template: {
       '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
       contentVersion: '1.0.0.0'
-      parameters: {
-        settingName: {
-          type: 'string'
-        }
-        targetResourceId: {
-          type: 'string'
-        }
-        workspaceId: {
-          type: 'string'
-        }
-        storageAccountId: {
-          type: 'string'
-        }
-      }
       resources: [
         {
           type: 'Microsoft.Insights/diagnosticSettings'
           apiVersion: '2021-05-01-preview'
-          scope: '[parameters(\'targetResourceId\')]'
-          name: '[parameters(\'settingName\')]'
+          scope: target.resourceId
+          name: '${target.name}-diag'
           properties: {
-            workspaceId: '[parameters(\'workspaceId\')]'
-            storageAccountId: '[parameters(\'storageAccountId\')]'
+            workspaceId: law.id
+            storageAccountId: diagStorage.id
             logs: [
               {
                 categoryGroup: 'allLogs'
