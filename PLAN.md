@@ -243,3 +243,20 @@ All questions answered above under "Locked decisions". Plan approved → proceed
 - Upstream sample: <https://github.com/microsoft-foundry/foundry-samples/tree/main/infrastructure/infrastructure-setup-bicep/19-private-network-agents-tools-setup>
 - Terraform predecessor: <https://github.com/nthewara/foundry>
 - Foundry BYO VNet docs: <https://learn.microsoft.com/azure/ai-foundry/how-to/configure-private-link>
+
+---
+
+## 🔄 Upstream sync log
+
+### 2026-06-16 — sync from upstream #19 (last upstream change 2026-06-12)
+
+Synced the **optional Azure Container Registry with Private Endpoint** feature from upstream PR #519 (`feat: add optional ACR with Private Endpoint`), adapted to this repo's modular hub-spoke idiom:
+
+- **New module `container-registry.bicep`** — Premium ACR + PE in the `pe` subnet + AcrPull role for the project identity. Unlike upstream (which creates/links the DNS zone inside the module), this repo delegates zone create/link to `dns.bicep`, so the module consumes `acrDnsZoneId` (same pattern as `foundry-private-endpoints.bicep`).
+- **`main.bicep`** — new `enableContainerRegistry` (default `true`) + `developerIpCidr` params; `privatelink.azurecr.io` added to the default `privateDnsZones` (now 7 zones); ACR module wired as Stage 10b after PEs + project; `acrId`/`acrLoginServer` outputs.
+- **`main.bicepparam.example`** + README updated to document the new params/resource.
+
+**Upstream changes intentionally NOT ported** (N/A to this repo's idiom):
+- *Private DNS zone defaults fix (PR #762)* — fixed an upstream bug where supplying `existingDnsZones` replaced (rather than merged with) the required-zone map. This repo's `dns.bicep` uses an explicit array + per-VNet links, so that bug class doesn't exist here.
+- *Deterministic `uniqueSuffix` (timestamp → `uniqueString(resourceGroup().id)`)* — this repo already uses a deterministic suffix (`uniqueString(subscription().subscriptionId, resourceGroupName)`, overridable via `randomSuffix`).
+- *`canadacentral` added to allowed locations* — this repo's `location` param is a free-form string (no `@allowed` list), so no change needed. Default region stays `australiaeast` (preserved customization).
