@@ -74,6 +74,12 @@ param bastionProvision bool = true
 @description('Deploy the Windows jump-box VM.')
 param vmDeploy bool = true
 
+@description('Provision an optional Azure Container Registry (Premium SKU) with a Private Endpoint in the `pe` subnet, a `privatelink.azurecr.io` DNS zone, and an AcrPull role for the project identity. Synced from upstream sample #19 (PR #519).')
+param enableContainerRegistry bool = true
+
+@description('Optional developer IP CIDR to allowlist for ACR push access (e.g., 203.0.113.0/26 or 10.0.0.0/16). When set, ACR public network access is enabled with a deny-all default + this allowlist rule so developers can push images. When empty, public access stays disabled (PE-only).')
+param developerIpCidr string = ''
+
 // -----------------------------------------------------------------------------
 // VM parameters
 // -----------------------------------------------------------------------------
@@ -92,7 +98,7 @@ param adminPassword string
 // DNS parameters
 // -----------------------------------------------------------------------------
 
-@description('Private DNS zones to create + link to all three VNets. The default 6-zone set covers everything Foundry needs.')
+@description('Private DNS zones to create + link to all three VNets. The default 7-zone set covers everything Foundry needs, including the ACR zone (`privatelink.azurecr.io`) used when enableContainerRegistry=true.')
 param privateDnsZones array = [
   'privatelink.cognitiveservices.azure.com'
   'privatelink.openai.azure.com'
@@ -100,6 +106,7 @@ param privateDnsZones array = [
   'privatelink.blob.${environment().suffixes.storage}'
   'privatelink.search.windows.net'
   'privatelink.documents.azure.com'
+  'privatelink.azurecr.io'
 ]
 
 // -----------------------------------------------------------------------------
@@ -150,8 +157,12 @@ param modelCapacity int = 30
 // -----------------------------------------------------------------------------
 
 var storageBlobZone = 'privatelink.blob.${environment().suffixes.storage}'
+var acrDnsZone = 'privatelink.azurecr.io'
 
 var suffix = empty(randomSuffix) ? take(uniqueString(subscription().subscriptionId, resourceGroupName), 4) : randomSuffix
+
+// ACR name: lowercase alphanumeric only (no hyphens allowed in ACR names).
+var acrName = toLower('acr${suffix}')
 
 // =============================================================================
 // Resource group
@@ -371,6 +382,29 @@ module foundryPe 'foundry-private-endpoints.bicep' = {
 }
 
 // =============================================================================
+// Stage 10b — Optional Azure Container Registry (Premium) with Private Endpoint
+//             in the `pe` subnet, AcrPull for the project identity. The
+//             `privatelink.azurecr.io` zone + VNet links are owned by dns.bicep;
+//             this module just consumes the zone ID (repo idiom). Synced from
+//             upstream sample #19 (PR #519).
+// =============================================================================
+
+module acr 'container-registry.bicep' = if (enableContainerRegistry) {
+  name: 'acr'
+  scope: rg
+  params: {
+    acrName: acrName
+    location: location
+    peSubnetId: networking.outputs.peSubnetId
+    suffix: suffix
+    acrDnsZoneId: dns.outputs.zoneIds[acrDnsZone]
+    developerIpCidr: developerIpCidr
+    projectPrincipalId: projectMod.outputs.projectPrincipalId
+  }
+  dependsOn: [ foundryPe ]
+}
+
+// =============================================================================
 // Stage 11a — Pre-cap-host role assignments (Search contrib, Storage Blob
 //              Data Contributor, Cosmos DB Operator)
 // =============================================================================
@@ -487,3 +521,7 @@ output projectName string = projectMod.outputs.projectName
 output projectId string = projectMod.outputs.projectId
 output capabilityHostName string = capHost.outputs.projectCapHost
 output lawId string = diagnostics.outputs.lawId
+#disable-next-line BCP318
+output acrId string = enableContainerRegistry ? acr.outputs.acrId : ''
+#disable-next-line BCP318
+output acrLoginServer string = enableContainerRegistry ? acr.outputs.acrLoginServer : ''

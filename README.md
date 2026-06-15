@@ -59,8 +59,9 @@ Iter 4 of the deploy (`foundrybicep-deploy-20260518-061151`) succeeded cleanly i
 - `foundrystg1a5d` — Storage account (blob private endpoint)
 - `cosmosdb1a5d` — Cosmos DB SQL (private endpoint, both control + data plane RBAC)
 - `aisearch1a5d` — AI Search (private endpoint)
+- `acr<suffix>` — *(optional)* Azure Container Registry, Premium SKU, private endpoint in the `pe` subnet, `privatelink.azurecr.io` zone, AcrPull granted to the project identity. Toggled by `enableContainerRegistry` (default `true`); set `developerIpCidr` to allowlist a push source. Synced from upstream sample #19 (PR #519).
 
-**Private DNS** — 6 zones for blob/cosmos/search/cognitiveservices/openai/aml, linked to both VNets.
+**Private DNS** — 7 zones for blob/cosmos/search/cognitiveservices/openai/aml + `privatelink.azurecr.io` (ACR), linked to all three VNets.
 
 **Diagnostics** — every resource that supports it fans out to a single LAW.
 
