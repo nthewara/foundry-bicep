@@ -71,6 +71,12 @@ param fwSku string = 'Basic'
 @description('Provision Azure Bastion (Basic SKU).')
 param bastionProvision bool = true
 
+@description('Create + attach an NSG to the delegated agents/mcp subnets with the blog-recommended minimum outbound rules (AzureActiveDirectory, AzureContainerAppsManagement, AzureContainerRegistry, 100.67.0.0/24). See https://nirmalt.com/posts/securingmicrosoftfoundrywithbyovnet.')
+param attachAgentNsg bool = true
+
+@description('When true (default), the Azure Firewall egress is locked to the Foundry-required FQDN allowlist + service-tag/infra network rules (least-privilege). When false, egress falls back to the permissive * -> * rule for troubleshooting.')
+param restrictEgress bool = true
+
 @description('Deploy the Windows jump-box VM.')
 param vmDeploy bool = true
 
@@ -175,6 +181,22 @@ resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
 }
 
 // =============================================================================
+// Stage 0 — Agent-subnet NSG (blog-recommended minimum outbound rules).
+//           Created before networking so its id can be attached to the
+//           delegated agents/mcp subnets in both networking passes.
+// =============================================================================
+
+module agentNsg 'nsg.bicep' = if (attachAgentNsg) {
+  name: 'agentNsg'
+  scope: rg
+  params: {
+    location: location
+    prefix: prefix
+    randomSuffix: suffix
+  }
+}
+
+// =============================================================================
 // Stage 1 — Networking (no UDR yet, FW IP not known)
 // =============================================================================
 
@@ -190,6 +212,9 @@ module networking 'networking.bicep' = {
     aiappVnetPrefix: aiappVnetPrefix
     routeTableNextHopIp: ''
     fwProvision: false // UDRs will be added by `routes` module after FW IP is known
+    attachAgentNsg: attachAgentNsg
+    #disable-next-line BCP318
+    agentNsgId: attachAgentNsg ? agentNsg.outputs.nsgId : ''
   }
 }
 
@@ -207,6 +232,7 @@ module firewall 'firewall.bicep' = if (fwProvision) {
     fwSku: fwSku
     fwSubnetId: networking.outputs.firewallSubnetId
     fwMgmtSubnetId: networking.outputs.firewallMgmtSubnetId
+    restrictEgress: restrictEgress
   }
 }
 
@@ -229,6 +255,9 @@ module routes 'networking.bicep' = if (fwProvision) {
     #disable-next-line BCP318
     routeTableNextHopIp: fwProvision ? firewall.outputs.firewallPrivateIp : ''
     fwProvision: true
+    attachAgentNsg: attachAgentNsg
+    #disable-next-line BCP318
+    agentNsgId: attachAgentNsg ? agentNsg.outputs.nsgId : ''
   }
 }
 
