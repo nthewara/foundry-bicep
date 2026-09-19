@@ -80,6 +80,19 @@ param enableContainerRegistry bool = true
 @description('Optional developer IP CIDR to allowlist for ACR push access (e.g., 203.0.113.0/26 or 10.0.0.0/16). When set, ACR public network access is enabled with a deny-all default + this allowlist rule so developers can push images. When empty, public access stays disabled (PE-only).')
 param developerIpCidr string = ''
 
+@description('Enable agent tracing with Application Insights, the existing diagnostics workspace, AMPLS, and project evaluation reader roles. Adds monitoring ingestion and private endpoint costs.')
+param enableAgentTracing bool = true
+
+@description('Create or reference a private-CA Key Vault, grant the ACCOUNT identity Secrets User, and add its private endpoint. Does not upload certificates or configure account trust.')
+param enableKeyVault bool = true
+
+@description('Optional name for a NEW private-CA vault (3-24 characters). Empty uses kv-<subscription/RG-derived suffix>. Ignored when existingKeyVaultResourceId is set.')
+@maxLength(24)
+param keyVaultName string = ''
+
+@description('Optional full ARM ID of an existing RBAC vault, including another RG/subscription in the same tenant. Its configuration is not changed. Ignored when enableKeyVault=false.')
+param existingKeyVaultResourceId string = ''
+
 // -----------------------------------------------------------------------------
 // VM parameters
 // -----------------------------------------------------------------------------
@@ -98,7 +111,7 @@ param adminPassword string
 // DNS parameters
 // -----------------------------------------------------------------------------
 
-@description('Private DNS zones to create + link to all three VNets. The default 7-zone set covers everything Foundry needs, including the ACR zone (`privatelink.azurecr.io`) used when enableContainerRegistry=true.')
+@description('Private DNS zones to create and link to all three VNets. Required core and enabled-feature zones are always merged in, so empty/partial overrides cannot remove required zones.')
 param privateDnsZones array = [
   'privatelink.cognitiveservices.azure.com'
   'privatelink.openai.azure.com'
@@ -158,8 +171,33 @@ param modelCapacity int = 30
 
 var storageBlobZone = 'privatelink.blob.${environment().suffixes.storage}'
 var acrDnsZone = 'privatelink.azurecr.io'
+var keyVaultDnsZone = 'privatelink.vaultcore.azure.net'
+var monitorDnsZones = [
+  'privatelink.monitor.azure.com'
+  'privatelink.oms.opinsights.azure.com'
+  'privatelink.ods.opinsights.azure.com'
+  'privatelink.agentsvc.azure-automation.net'
+  storageBlobZone
+]
+var effectivePrivateDnsZones = union(privateDnsZones, [
+  'privatelink.cognitiveservices.azure.com'
+  'privatelink.openai.azure.com'
+  'privatelink.services.ai.azure.com'
+  storageBlobZone
+  'privatelink.search.windows.net'
+  'privatelink.documents.azure.com'
+], enableContainerRegistry ? [acrDnsZone] : [], enableKeyVault ? [keyVaultDnsZone] : [], enableAgentTracing ? monitorDnsZones : [])
+var commonTags = union(tags, { SecurityControl: 'Ignore' })
 
 var suffix = empty(randomSuffix) ? take(uniqueString(subscription().subscriptionId, resourceGroupName), 4) : randomSuffix
+var normalizedExistingKeyVaultId = trim(existingKeyVaultResourceId)
+var useExistingKeyVault = enableKeyVault && !empty(normalizedExistingKeyVaultId)
+var existingKeyVaultParts = split(normalizedExistingKeyVaultId, '/')
+var resolvedKeyVaultName = useExistingKeyVault
+  ? last(existingKeyVaultParts)
+  : (empty(trim(keyVaultName)) ? 'kv-${uniqueString(subscription().subscriptionId, resourceGroupName)}' : trim(keyVaultName))
+var keyVaultSubscriptionId = useExistingKeyVault ? existingKeyVaultParts[2] : subscription().subscriptionId
+var keyVaultResourceGroupName = useExistingKeyVault ? existingKeyVaultParts[4] : resourceGroupName
 
 // ACR name: lowercase alphanumeric only (no hyphens allowed in ACR names).
 var acrName = toLower('acr${suffix}')
@@ -171,7 +209,7 @@ var acrName = toLower('acr${suffix}')
 resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: resourceGroupName
   location: location
-  tags: tags
+  tags: commonTags
 }
 
 // =============================================================================
@@ -275,7 +313,8 @@ module dns 'dns.bicep' = {
   params: {
     prefix: prefix
     randomSuffix: suffix
-    privateDnsZones: privateDnsZones
+    privateDnsZones: effectivePrivateDnsZones
+    tags: commonTags
     hubVnetId: networking.outputs.hubVnetId
     aiappVnetId: networking.outputs.aiappVnetId
     vmVnetId: networking.outputs.vmVnetId
@@ -318,6 +357,7 @@ module foundry 'foundry.bicep' = {
   params: {
     accountName: aiServicesName
     location: location
+    tags: commonTags
     modelName: modelName
     modelFormat: modelFormat
     modelVersion: modelVersion
@@ -339,6 +379,7 @@ module projectMod 'project.bicep' = {
   params: {
     accountName: foundry.outputs.accountName
     location: location
+    tags: commonTags
     projectName: projectName
     projectDescription: projectDescription
     displayName: projectDisplayName
@@ -351,6 +392,19 @@ module projectMod 'project.bicep' = {
     azureStorageName: foundryDeps.outputs.azureStorageName
     azureStorageSubscriptionId: foundryDeps.outputs.azureStorageSubscriptionId
     azureStorageResourceGroupName: foundryDeps.outputs.azureStorageResourceGroupName
+  }
+}
+
+// Scope RBAC with the vault, including when the vault is outside the stack RG.
+module keyVault 'key-vault.bicep' = if (enableKeyVault) {
+  name: 'keyVault-${suffix}'
+  scope: resourceGroup(keyVaultSubscriptionId, keyVaultResourceGroupName)
+  params: {
+    keyVaultName: resolvedKeyVaultName
+    createVault: !useExistingKeyVault
+    location: location
+    accountPrincipalId: foundry.outputs.accountPrincipalId
+    tags: commonTags
   }
 }
 
@@ -370,14 +424,16 @@ module foundryPe 'foundry-private-endpoints.bicep' = {
     vnetName: networking.outputs.aiappVnetName
     peSubnetName: networking.outputs.peSubnetName
     suffix: suffix
-    dnsZoneIds: {
+    tags: commonTags
+    keyVaultResourceId: enableKeyVault ? keyVault!.outputs.keyVaultResourceId : ''
+    dnsZoneIds: union({
       aiServices: dns.outputs.zoneIds['privatelink.services.ai.azure.com']
       openAi: dns.outputs.zoneIds['privatelink.openai.azure.com']
       cognitiveServices: dns.outputs.zoneIds['privatelink.cognitiveservices.azure.com']
       aiSearch: dns.outputs.zoneIds['privatelink.search.windows.net']
       storageBlob: dns.outputs.zoneIds[storageBlobZone]
       cosmosDB: dns.outputs.zoneIds['privatelink.documents.azure.com']
-    }
+    }, enableKeyVault ? { keyVault: dns.outputs.zoneIds[keyVaultDnsZone] } : {})
   }
 }
 
@@ -472,6 +528,11 @@ module diagnostics 'diagnostics.bicep' = {
     location: location
     prefix: prefix
     randomSuffix: suffix
+    tags: commonTags
+    enableAgentTracing: enableAgentTracing
+    aiAccountName: foundry.outputs.accountName
+    peSubnetId: networking.outputs.peSubnetId
+    monitorDnsZoneIds: enableAgentTracing ? map(monitorDnsZones, zone => dns.outputs.zoneIds[zone]) : []
     targets: concat(
       [
         { name: 'hubVnet', resourceId: networking.outputs.hubVnetId }
@@ -498,7 +559,20 @@ module diagnostics 'diagnostics.bicep' = {
       ] : []
     )
   }
-  dependsOn: [ rolesPost, dns ]
+  dependsOn: [ rolesPost ]
+}
+
+module telemetryRoles 'foundry-roles.bicep' = if (enableAgentTracing) {
+  name: 'telemetryRoles'
+  scope: rg
+  params: {
+    phase: 'telemetry'
+    projectPrincipalId: projectMod.outputs.projectPrincipalId
+    appInsightsName: diagnostics.outputs.appInsightsName
+    aiSearchName: foundryDeps.outputs.aiSearchName
+    cosmosDBName: foundryDeps.outputs.cosmosDBName
+    storageName: foundryDeps.outputs.azureStorageName
+  }
 }
 
 // =============================================================================
@@ -521,6 +595,13 @@ output projectName string = projectMod.outputs.projectName
 output projectId string = projectMod.outputs.projectId
 output capabilityHostName string = capHost.outputs.projectCapHost
 output lawId string = diagnostics.outputs.lawId
+output lawName string = diagnostics.outputs.lawName
+output appInsightsId string = diagnostics.outputs.appInsightsId
+output appInsightsName string = diagnostics.outputs.appInsightsName
+output appInsightsAppId string = diagnostics.outputs.appInsightsAppId
+output amplsId string = diagnostics.outputs.amplsId
+output keyVaultName string = enableKeyVault ? keyVault!.outputs.keyVaultName : ''
+output keyVaultResourceId string = enableKeyVault ? keyVault!.outputs.keyVaultResourceId : ''
 #disable-next-line BCP318
 output acrId string = enableContainerRegistry ? acr.outputs.acrId : ''
 #disable-next-line BCP318

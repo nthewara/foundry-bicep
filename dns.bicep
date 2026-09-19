@@ -12,6 +12,10 @@ param prefix string
 @description('Short random suffix for uniqueness in link names.')
 param randomSuffix string
 
+@description('Tags applied to zones and VNet links.')
+param tags object = {}
+var commonTags = union(tags, { SecurityControl: 'Ignore' })
+
 @description('List of private DNS zone FQDNs to create. Defaults to the six Foundry-private-endpoint zones.')
 param privateDnsZones array = [
   'privatelink.cognitiveservices.azure.com'
@@ -39,6 +43,7 @@ param vmVnetId string
 resource zones 'Microsoft.Network/privateDnsZones@2024-06-01' = [for zoneName in privateDnsZones: {
   name: zoneName
   location: 'global'
+  tags: commonTags
 }]
 
 // -----------------------------------------------------------------------------
@@ -50,6 +55,7 @@ resource hubLinks 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06
   parent: zones[i]
   name: '${prefix}-hub-link-${randomSuffix}'
   location: 'global'
+  tags: commonTags
   properties: {
     virtualNetwork: {
       id: hubVnetId
@@ -62,6 +68,7 @@ resource aiappLinks 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-
   parent: zones[i]
   name: '${prefix}-aiapp-link-${randomSuffix}'
   location: 'global'
+  tags: commonTags
   properties: {
     virtualNetwork: {
       id: aiappVnetId
@@ -74,6 +81,7 @@ resource vmLinks 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-
   parent: zones[i]
   name: '${prefix}-vm-link-${randomSuffix}'
   location: 'global'
+  tags: commonTags
   properties: {
     virtualNetwork: {
       id: vmVnetId

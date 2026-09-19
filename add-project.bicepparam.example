@@ -1,17 +1,21 @@
 // add-project.bicepparam.example
 // Sanitised example for add-project.bicep. Copy to
-// ~/workspace/tfvars/foundry-bicep-add-project.bicepparam (or wherever you
-// keep tfvars-style secrets outside the repo), fill in real values, and
+// add-project.bicepparam beside add-project.bicep, fill in real values, and
 // deploy with:
 //   az deployment group create -g <rg> \
 //     --template-file add-project.bicep \
-//     --parameters ~/workspace/tfvars/foundry-bicep-add-project.bicepparam
+//     --parameters add-project.bicepparam
+// If storing elsewhere, update the relative `using` path as well.
 //
 // All values below are placeholders.
 
 using 'add-project.bicep'
 
 param location = 'australiaeast'
+param tags = {
+  lab: 'foundry-bicep'
+  SecurityControl: 'Ignore'
+}
 
 // Existing AI Foundry account
 param existingAccountName = '<aiservices-account-name>'
@@ -23,6 +27,19 @@ param projectName = 'project2'
 param projectDescription = 'Second AI Foundry project sharing the same account'
 param displayName = 'project2 (dev)'
 param projectCapHost = 'caphostproj'
+// Default timestamp generates a NEW project on every deployment. Set a stable
+// timestamp explicitly when retrying a deployment for the same new project.
+// param deploymentTimestamp = '20260919000000'
+
+// For tracing-enabled stacks, paste main.bicep's appInsightsId output.
+// Grants evaluation readers to the NEW project MI at this component's scope.
+// Reuses the existing account-shared AppInsights connection. Leave empty only
+// for stacks without tracing. Can target another same-tenant RG/subscription.
+param existingAppInsightsResourceId = ''
+// Example: '/subscriptions/<subscription-guid>/resourceGroups/<monitor-rg>/providers/Microsoft.Insights/components/<appinsights-name>'
+
+// Current data-role module requires Search, Storage and Cosmos to share the
+// Storage subscription/RG. Separate data-resource scopes are not supported.
 
 // Existing AI Search
 param existingAiSearchName = '<aisearch-name>'

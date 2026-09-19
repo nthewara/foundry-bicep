@@ -27,6 +27,10 @@ param accountName string
 @description('Azure region for the project.')
 param location string
 
+@description('Tags applied to the project.')
+param tags object = {}
+var commonTags = union(tags, { SecurityControl: 'Ignore' })
+
 @description('Project name.')
 param projectName string
 
@@ -84,6 +88,7 @@ resource project 'Microsoft.CognitiveServices/accounts/projects@2025-04-01-previ
   parent: account
   name: projectName
   location: location
+  tags: commonTags
   identity: {
     type: 'SystemAssigned'
   }

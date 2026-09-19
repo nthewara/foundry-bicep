@@ -7,7 +7,7 @@
   host) to that account.
 
   Ported with minimal changes from upstream
-  `infrastructure-setup-bicep/19-private-network-agents-tools-setup/add-project.bicep`.
+  `infrastructure/infrastructure-setup-bicep/19-private-network-agent-tools/add-project.bicep`.
 
   Differences from upstream:
     - Uses our consolidated modules (`foundry-identity.bicep`,
@@ -24,6 +24,9 @@
 
 @description('Azure region for the project resources.')
 param location string = resourceGroup().location
+
+@description('Tags applied to the additional project.')
+param tags object = {}
 
 @description('Name of the existing AI Foundry / AI Services account.')
 param existingAccountName string
@@ -68,6 +71,15 @@ param cosmosDBResourceGroupName string
 @description('Subscription containing the Cosmos DB account.')
 param cosmosDBSubscriptionId string
 
+@description('Application Insights ARM ID output by main.bicep. Supply for tracing-enabled stacks to grant this project evaluation readers. The account-shared connection is reused, not recreated. Empty skips telemetry RBAC.')
+param existingAppInsightsResourceId string = ''
+
+var appInsightsResourceId = trim(existingAppInsightsResourceId)
+var enableTelemetryRoles = !empty(appInsightsResourceId)
+var appInsightsParts = split(appInsightsResourceId, '/')
+var appInsightsSubscriptionId = enableTelemetryRoles ? appInsightsParts[2] : subscription().subscriptionId
+var appInsightsResourceGroupName = enableTelemetryRoles ? appInsightsParts[4] : resourceGroup().name
+
 // Build a short, unique suffix for this project
 @description('Deployment timestamp used to derive a unique suffix. Leave default.')
 param deploymentTimestamp string = utcNow('yyyyMMddHHmmss')
@@ -81,6 +93,7 @@ module aiProject 'foundry-identity.bicep' = {
   params: {
     accountName: existingAccountName
     location: location
+    tags: tags
     projectName: finalProjectName
     projectDescription: projectDescription
     displayName: displayName
@@ -94,6 +107,19 @@ module aiProject 'foundry-identity.bicep' = {
     azureStorageSubscriptionId: storageSubscriptionId
     azureStorageResourceGroupName: storageResourceGroupName
     uniqueConnectionSuffix: '-${finalProjectName}'
+  }
+}
+
+module telemetryRoles 'foundry-roles.bicep' = if (enableTelemetryRoles) {
+  name: 'telemetry-roles-${uniqueSuffix}-deployment'
+  scope: resourceGroup(appInsightsSubscriptionId, appInsightsResourceGroupName)
+  params: {
+    phase: 'telemetry'
+    projectPrincipalId: aiProject.outputs.projectPrincipalId
+    appInsightsName: last(appInsightsParts)
+    aiSearchName: existingAiSearchName
+    cosmosDBName: existingCosmosDBName
+    storageName: existingStorageName
   }
 }
 

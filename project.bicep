@@ -15,6 +15,9 @@ param accountName string
 @description('Azure region for the project.')
 param location string
 
+@description('Tags applied to the project.')
+param tags object = {}
+
 @description('Project name.')
 param projectName string
 
@@ -50,6 +53,7 @@ module projectIdentity 'foundry-identity.bicep' = {
   params: {
     accountName: accountName
     location: location
+    tags: tags
     projectName: projectName
     projectDescription: projectDescription
     displayName: displayName

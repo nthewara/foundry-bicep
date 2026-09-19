@@ -22,6 +22,10 @@ param accountName string
 @description('Azure region for the account.')
 param location string
 
+@description('Tags applied to the account.')
+param tags object = {}
+var commonTags = union(tags, { SecurityControl: 'Ignore' })
+
 @description('Name of the model to deploy (e.g. gpt-4o-mini).')
 param modelName string
 
@@ -47,6 +51,7 @@ param networkInjection string = 'true'
 resource account 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = {
   name: accountName
   location: location
+  tags: commonTags
   sku: {
     name: 'S0'
   }
@@ -73,7 +78,7 @@ resource account 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = {
           }
         ]
       : null)
-    disableLocalAuth: false
+    disableLocalAuth: true
   }
 }
 
