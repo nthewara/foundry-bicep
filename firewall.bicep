@@ -21,6 +21,44 @@ param fwSubnetId string
 @description('Resource ID of the AzureFirewallManagementSubnet. REQUIRED when fwSku == Basic.')
 param fwMgmtSubnetId string
 
+@description('When true (default), egress is locked to the Foundry-required FQDN allowlist (application rules) plus service-tag / infra network rules (least-privilege). When false, egress falls back to the permissive `* -> *` application rule for troubleshooting.')
+param restrictEgress bool = true
+
+// ---------------------------------------------------------------------------
+// Egress FQDN allowlist
+// ---------------------------------------------------------------------------
+
+// Curated Foundry-required FQDN allowlist. When restrictEgress is false we fall
+// back to a single wildcard so the firewall behaves like the old permissive
+// rule (useful for troubleshooting).
+var appRuleFqdns = restrictEgress ? [
+  '*.identity.azure.net'
+  #disable-next-line no-hardcoded-env-urls
+  'login.microsoftonline.com'
+  '*.login.microsoft.com'
+  'mcr.microsoft.com'
+  '*.data.mcr.microsoft.com'
+  '*.cdn.mscr.io'
+  '*.azurecr.io'
+  #disable-next-line no-hardcoded-env-urls
+  '*.blob.core.windows.net'
+  '*.azure-automation.net'
+  #disable-next-line no-hardcoded-env-urls
+  'management.azure.com'
+  '*.azurecontainerapps.io'
+  '*.cognitiveservices.azure.com'
+  '*.openai.azure.com'
+  '*.services.ai.azure.com'
+  '*.search.windows.net'
+  '*.documents.azure.com'
+  'packages.microsoft.com'
+  '*.ubuntu.com'
+  'archive.ubuntu.com'
+  'security.ubuntu.com'
+] : [
+  '*'
+]
+
 // ---------------------------------------------------------------------------
 // Public IPs
 // ---------------------------------------------------------------------------
@@ -89,9 +127,7 @@ resource fwRuleCollectionGroup 'Microsoft.Network/firewallPolicies/ruleCollectio
             sourceAddresses: [
               '*'
             ]
-            targetFqdns: [
-              '*'
-            ]
+            targetFqdns: appRuleFqdns
             protocols: [
               {
                 protocolType: 'Http'
@@ -102,6 +138,32 @@ resource fwRuleCollectionGroup 'Microsoft.Network/firewallPolicies/ruleCollectio
                 port: 443
               }
             ]
+          }
+        ]
+      }
+      {
+        ruleCollectionType: 'FirewallPolicyFilterRuleCollection'
+        name: 'AllowFoundryInfra'
+        priority: 300
+        action: {
+          type: 'Allow'
+        }
+        rules: [
+          {
+            ruleType: 'NetworkRule'
+            name: 'Allow-Entra-443'
+            ipProtocols: [ 'TCP' ]
+            sourceAddresses: [ '*' ]
+            destinationAddresses: [ 'AzureActiveDirectory' ]
+            destinationPorts: [ '443' ]
+          }
+          {
+            ruleType: 'NetworkRule'
+            name: 'Allow-Foundry-Infra-100-67'
+            ipProtocols: [ 'Any' ]
+            sourceAddresses: [ '*' ]
+            destinationAddresses: [ '100.67.0.0/24' ]
+            destinationPorts: [ '*' ]
           }
         ]
       }

@@ -46,6 +46,26 @@ Iter 4 of the deploy (`foundrybicep-deploy-20260518-061151`) succeeded cleanly i
 - Private endpoints, agents and MCP subnets remain in the existing topology. Naming an MCP subnet does not deploy tool servers.
 - Default routes point to Azure Firewall when `fwProvision=true`; disabling it leaves unrestricted egress.
 
+### 🔐 BYO-VNET egress hardening (NSG + Azure Firewall)
+
+Based on [Securing Microsoft Foundry with Bring Your Own VNET](https://nirmalt.com/posts/securingmicrosoftfoundrywithbyovnet), the delegated agent subnets and the firewall egress are locked down to a least-privilege model.
+
+**NSG on the delegated `agents` + `mcp` subnets** (`nsg.bicep`, attached via `attachAgentNsg=true`) — minimum required outbound rules:
+
+| Priority | Rule | Destination | Port |
+|---|---|---|---|
+| 100 | Allow-Entra-443 | `AzureActiveDirectory` (service tag) | 443/TCP |
+| 110 | Allow-ACA-Mgmt-443 | `AzureContainerAppsManagement` (service tag) | 443/TCP |
+| 120 | Allow-ACR-443 | `AzureContainerRegistry` (service tag) | 443/TCP |
+| 130 | Allow-Foundry-Infra | `100.67.0.0/24` (agent infra comms) | any |
+
+**Azure Firewall egress** (`firewall.bicep`, controlled by `restrictEgress=true`) — replaces the old permissive `* → *` application rule:
+- **Network rules** (`AllowFoundryInfra`): `AzureActiveDirectory` service tag on 443, and `100.67.0.0/24` on any port. Existing RFC1918 east-west rules preserved.
+- **Application rules**: curated Foundry FQDN allowlist (`mcr.microsoft.com`, `*.data.mcr.microsoft.com`, `*.azurecr.io`, `*.azurecontainerapps.io`, `*.cognitiveservices.azure.com`, `*.openai.azure.com`, `*.services.ai.azure.com`, `*.search.windows.net`, `*.documents.azure.com`, `login.microsoftonline.com`, `management.azure.com`, `*.blob.core.windows.net`, Ubuntu/package repos, etc.).
+- Set `restrictEgress=false` to fall back to `* → *` for troubleshooting.
+
+All Foundry PaaS resources (Cosmos DB, AI Search, Storage, Foundry account) remain **public network access disabled** — private-endpoint only, as the blog requires.
+
 **Edge + jump host**
 - Azure Firewall Basic with management subnet and data/management public IPs.
 - Azure Bastion Basic and the Windows jump-box (`Standard_D8s_v5`, `AutomaticByPlatform` patching), individually optional.

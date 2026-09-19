@@ -38,6 +38,12 @@ param routeTableNextHopIp string = ''
 @description('Whether the firewall is being provisioned. UDRs are only created when this is true AND routeTableNextHopIp is non-empty.')
 param fwProvision bool = true
 
+@description('Whether to attach the agent NSG to the delegated agents/mcp subnets.')
+param attachAgentNsg bool = true
+
+@description('Resource id of the NSG to attach to the delegated agents/mcp subnets. Pass empty string to leave the subnets without an NSG.')
+param agentNsgId string = ''
+
 // -----------------------------------------------------------------------------
 // Variables (subnet math — mirrors locals.tf in the Terraform repo)
 // -----------------------------------------------------------------------------
@@ -183,6 +189,9 @@ resource aiappVnet 'Microsoft.Network/virtualNetworks@2024-01-01' = {
         name: 'agents'
         properties: {
           addressPrefix: '${aiappPlus1Base}.0/26'
+          networkSecurityGroup: (attachAgentNsg && !empty(agentNsgId)) ? {
+            id: agentNsgId
+          } : null
           delegations: [
             {
               name: 'Microsoft.App.environments'
@@ -197,6 +206,9 @@ resource aiappVnet 'Microsoft.Network/virtualNetworks@2024-01-01' = {
         name: 'mcp'
         properties: {
           addressPrefix: '${aiappPlus1Base}.64/26'
+          networkSecurityGroup: (attachAgentNsg && !empty(agentNsgId)) ? {
+            id: agentNsgId
+          } : null
           delegations: [
             {
               name: 'Microsoft.App.environments'
