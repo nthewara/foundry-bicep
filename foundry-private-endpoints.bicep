@@ -25,6 +25,13 @@ param storageName string
 @description('Name of the Cosmos DB account.')
 param cosmosDBName string
 
+@description('Optional full ARM ID of the private-CA Key Vault, including cross-subscription vaults.')
+param keyVaultResourceId string = ''
+
+@description('Tags applied to private endpoints.')
+param tags object = {}
+var commonTags = union(tags, { SecurityControl: 'Ignore' })
+
 @description('Optional full ARM resource ID of a Microsoft Fabric workspace to wire in via private endpoint. Leave empty to skip.')
 param fabricWorkspaceResourceId string = ''
 
@@ -55,7 +62,7 @@ param cosmosDBSubscriptionId string = subscription().subscriptionId
 @description('Resource group containing the Cosmos DB account.')
 param cosmosDBResourceGroupName string = resourceGroup().name
 
-@description('Pre-existing private DNS zone IDs keyed by service. Produced by dns.bicep. Required keys: aiServices, openAi, cognitiveServices, aiSearch, storageBlob, cosmosDB. Optional: fabric.')
+@description('Pre-existing private DNS zone IDs keyed by service. Required: aiServices, openAi, cognitiveServices, aiSearch, storageBlob, cosmosDB. Optional: fabric, keyVault (required when the corresponding resource ID is supplied).')
 param dnsZoneIds object
 
 // ---- Resource references ----
@@ -97,6 +104,7 @@ var fabricWorkspaceName = fabricPassedIn ? last(fabricParts) : ''
 resource aiAccountPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   name: '${aiAccountName}-private-endpoint'
   location: resourceGroup().location
+  tags: commonTags
   properties: {
     subnet: { id: peSubnet.id }
     privateLinkServiceConnections: [
@@ -115,6 +123,7 @@ resource aiAccountPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01
 resource aiSearchPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   name: '${aiSearchName}-private-endpoint'
   location: resourceGroup().location
+  tags: commonTags
   properties: {
     subnet: { id: peSubnet.id }
     privateLinkServiceConnections: [
@@ -133,6 +142,7 @@ resource aiSearchPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01'
 resource storagePrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   name: '${storageName}-private-endpoint'
   location: resourceGroup().location
+  tags: commonTags
   properties: {
     subnet: { id: peSubnet.id }
     privateLinkServiceConnections: [
@@ -151,6 +161,7 @@ resource storagePrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' 
 resource cosmosDBPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   name: '${cosmosDBName}-private-endpoint'
   location: resourceGroup().location
+  tags: commonTags
   properties: {
     subnet: { id: peSubnet.id }
     privateLinkServiceConnections: [
@@ -169,6 +180,7 @@ resource cosmosDBPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01'
 resource fabricPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = if (fabricPassedIn) {
   name: '${fabricWorkspaceName}-fabric-private-endpoint'
   location: resourceGroup().location
+  tags: commonTags
   properties: {
     subnet: { id: peSubnet.id }
     privateLinkServiceConnections: [
@@ -179,6 +191,34 @@ resource fabricPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' =
           groupIds: ['Fabric']
         }
       }
+    ]
+  }
+}
+
+resource keyVaultPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = if (!empty(keyVaultResourceId)) {
+  name: '${last(split(keyVaultResourceId, '/'))}-vault-private-endpoint'
+  location: resourceGroup().location
+  tags: commonTags
+  properties: {
+    subnet: { id: peSubnet.id }
+    privateLinkServiceConnections: [
+      {
+        name: 'key-vault-connection'
+        properties: {
+          privateLinkServiceId: keyVaultResourceId
+          groupIds: ['vault']
+        }
+      }
+    ]
+  }
+}
+
+resource keyVaultDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!empty(keyVaultResourceId)) {
+  parent: keyVaultPrivateEndpoint
+  name: 'key-vault-dns'
+  properties: {
+    privateDnsZoneConfigs: [
+      { name: 'key-vault', properties: { privateDnsZoneId: dnsZoneIds.keyVault } }
     ]
   }
 }

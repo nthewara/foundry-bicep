@@ -33,11 +33,12 @@
   per target RG.
 */
 
-@description('Which phase of role assignments to apply: pre, post, or all.')
+@description('Which phase to apply: pre, post, all (data roles), or telemetry (Application Insights evaluation readers only).')
 @allowed([
   'pre'
   'post'
   'all'
+  'telemetry'
 ])
 param phase string
 
@@ -58,6 +59,9 @@ param projectWorkspaceIdGuid string = ''
 
 @description('Optional uniqueness salt added to role-assignment guids. Set to a per-project string for multi-project deployments (matches upstream *-unique modules).')
 param uniqueSuffix string = ''
+
+@description('Application Insights component in this module deployment scope. Required for phase=telemetry.')
+param appInsightsName string = ''
 
 var isPre = phase == 'pre' || phase == 'all'
 var isPost = phase == 'post' || phase == 'all'
@@ -184,3 +188,22 @@ resource cosmosDataPlaneAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRol
     scope: cosmosAccountScope
   }
 }
+
+resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = {
+  name: appInsightsName
+}
+
+var telemetryReaderRoles = [
+  '73c42c96-874c-492b-b04d-ab87d138a893' // Log Analytics Reader
+  'dbc9c667-e97f-4491-aee6-90b9cf960190' // Privileged Monitoring Data Reader (GenAI content)
+]
+
+resource telemetryReaders 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for roleGuid in telemetryReaderRoles: if (phase == 'telemetry') {
+  scope: appInsights
+  name: guid(projectPrincipalId, roleGuid, appInsights.id)
+  properties: {
+    principalId: projectPrincipalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleGuid)
+    principalType: 'ServicePrincipal'
+  }
+}]

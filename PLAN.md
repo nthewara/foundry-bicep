@@ -1,6 +1,6 @@
 # foundry-bicep — Build Plan
 
-> Bicep port of [microsoft-foundry/foundry-samples #19 — `19-private-network-agents-tools-setup`](https://github.com/microsoft-foundry/foundry-samples/tree/main/infrastructure/infrastructure-setup-bicep/19-private-network-agents-tools-setup), wrapped in the same hub-spoke + Firewall + jump-box + diagnostics structure as [`nthewara/foundry`](https://github.com/nthewara/foundry) (which is Terraform).
+> Bicep port of [microsoft-foundry/foundry-samples sample 19, `19-private-network-agent-tools`](https://github.com/microsoft-foundry/foundry-samples/tree/main/infrastructure/infrastructure-setup-bicep/19-private-network-agent-tools), wrapped in the same hub-spoke + Firewall + jump-box + diagnostics structure as [`nthewara/foundry`](https://github.com/nthewara/foundry) (which is Terraform).
 
 **Status:** ✅ Plan approved 2026-05-18. Decisions locked (see bottom). Ready to start P1.
 
@@ -240,7 +240,7 @@ All questions answered above under "Locked decisions". Plan approved → proceed
 
 ## 🔗 References
 
-- Upstream sample: <https://github.com/microsoft-foundry/foundry-samples/tree/main/infrastructure/infrastructure-setup-bicep/19-private-network-agents-tools-setup>
+- Upstream sample: <https://github.com/microsoft-foundry/foundry-samples/tree/main/infrastructure/infrastructure-setup-bicep/19-private-network-agent-tools>
 - Terraform predecessor: <https://github.com/nthewara/foundry>
 - Foundry BYO VNet docs: <https://learn.microsoft.com/azure/ai-foundry/how-to/configure-private-link>
 
@@ -250,13 +250,42 @@ All questions answered above under "Locked decisions". Plan approved → proceed
 
 ### 2026-06-16 — sync from upstream #19 (last upstream change 2026-06-12)
 
-Synced the **optional Azure Container Registry with Private Endpoint** feature from upstream PR #519 (`feat: add optional ACR with Private Endpoint`), adapted to this repo's modular hub-spoke idiom:
+Synced the **optional Azure Container Registry with Private Endpoint** feature from upstream microsoft-foundry/foundry-samples#519 (`feat: add optional ACR with Private Endpoint`), adapted to this repo's modular hub-spoke idiom:
 
 - **New module `container-registry.bicep`** — Premium ACR + PE in the `pe` subnet + AcrPull role for the project identity. Unlike upstream (which creates/links the DNS zone inside the module), this repo delegates zone create/link to `dns.bicep`, so the module consumes `acrDnsZoneId` (same pattern as `foundry-private-endpoints.bicep`).
 - **`main.bicep`** — new `enableContainerRegistry` (default `true`) + `developerIpCidr` params; `privatelink.azurecr.io` added to the default `privateDnsZones` (now 7 zones); ACR module wired as Stage 10b after PEs + project; `acrId`/`acrLoginServer` outputs.
 - **`main.bicepparam.example`** + README updated to document the new params/resource.
 
 **Upstream changes intentionally NOT ported** (N/A to this repo's idiom):
-- *Private DNS zone defaults fix (PR #762)* — fixed an upstream bug where supplying `existingDnsZones` replaced (rather than merged with) the required-zone map. This repo's `dns.bicep` uses an explicit array + per-VNet links, so that bug class doesn't exist here.
+- *Private DNS zone defaults fix (microsoft-foundry/foundry-samples#762)* — fixed an upstream bug where supplying `existingDnsZones` replaced (rather than merged with) the required-zone map. This repo's `dns.bicep` uses an explicit array + per-VNet links, so that bug class doesn't exist here.
 - *Deterministic `uniqueSuffix` (timestamp → `uniqueString(resourceGroup().id)`)* — this repo already uses a deterministic suffix (`uniqueString(subscription().subscriptionId, resourceGroupName)`, overridable via `randomSuffix`).
 - *`canadacentral` added to allowed locations* — this repo's `location` param is a free-form string (no `@allowed` list), so no change needed. Default region stays `australiaeast` (preserved customization).
+
+### 2026-09-19 - pinned upstream infrastructure sync
+
+**Source:** [microsoft-foundry/foundry-samples at `e0f4042a0080158d4fe351dfe7c3fb47a9b75a5e`](https://github.com/microsoft-foundry/foundry-samples/tree/e0f4042a0080158d4fe351dfe7c3fb47a9b75a5e/infrastructure/infrastructure-setup-bicep/19-private-network-agent-tools), main committed 2026-09-18. The latest sample commit is [`74b93d65e1b2c1e22d661ef883a747962f47a8ee`](https://github.com/microsoft-foundry/foundry-samples/commit/74b93d65e1b2c1e22d661ef883a747962f47a8ee), committed 2026-09-15. The snapshot and upstream LICENSE were verified against that pinned tree. Microsoft copyright/permission is retained in `LICENSE.upstream`.
+
+**Local baseline:** `e421adb` includes the June 16 merge of implementation `0348f4b`. The preceding sync log supplied a June 12 date but no immutable upstream SHA. The recovered path history has 13 commits under the current name and six under two predecessor names, March 11 through September 15. This entry establishes definitive provenance without retrospectively guessing the old sync's exact source revision.
+
+| Upstream change | Local applicability |
+|---|---|
+| June 17 `85f28656af55574f0f9d1eaf25af4281684727b4`: disable account local auth | Applied in `foundry.bicep`; README explicitly warns existing key-auth consumers to migrate |
+| June 23 `16fcedc3ed1c7ccadcf73a7e58aea3b48413673b`: per-project Storage Owner GUID | Local GUID already includes project principal and optional suffix. Preserved it and workspace ABAC rather than introducing a different GUID for an existing identical role/scope/principal |
+| June 23 `aba282e7e98be16e747676c36ae639cc98e66eaf`: tracing/AMPLS and duplicate ACR DNS-link fix | Integrated App Insights, shared account connection and AMPLS into `diagnostics.bicep`, reusing its LAW; centralized DNS already avoids duplicate ACR links |
+| July 21 `e47d01180329f46a5e0198e19e3eae5b3d22bf72`: evaluation readers | Added isolated `telemetry` phase to `foundry-roles.bicep`, wired to initial AND additional project identities at App Insights scope |
+| September 15 `74b93d65e1b2c1e22d661ef883a747962f47a8ee`: private-CA vault and operations | One scoped `key-vault.bicep` module creates/references the vault and grants ACCOUNT identity Secrets User; existing PE module consumes its ID; recovery tooling is documented separately |
+
+**Deliberate adaptations and preserved contracts**
+
+- Main remains subscription-scoped with the same deterministic naming, RG, three VNets, two-pass routes, Basic Firewall/Bastion, Windows D8s_v5 default, secure password, Australia East default, unrestricted location and model parameters. No topology/diagram regeneration or BYO-VNet changes; separate #15 owns that work.
+- ACR remains default-enabled Premium, PE-backed, with project AcrPull and optional developer CIDR. Existing outputs, Cosmos built-in role `00000000-0000-0000-0000-000000000002`, workspace Storage ABAC, deployment ordering and diagnostics fixes are retained.
+- `enableAgentTracing` and `enableKeyVault` default to true, but can be disabled for new stacks. Disabled flags in incremental deployment do not delete existing resources. README describes the authentication change, new charges and decommissioning caveats.
+- Required central DNS zones are merged with caller overrides. AMPLS attaches FIVE mappings, including the existing Blob zone. Upstream's four-zone omission is not copied; the default is 12 unique zones with three VNet links each.
+- Tracing uses private App Insights/LAW ingestion but explicitly retains authorized public queries and AMPLS `Open` query mode. LAW diagnostic settings use the Azure platform private channel. See [Monitor topology/access guidance](https://learn.microsoft.com/azure/azure-monitor/fundamentals/private-link-design) and [five-zone requirements](https://learn.microsoft.com/azure/azure-monitor/fundamentals/private-link-configure#review-and-validate-ampls-configuration).
+- Vault creation preserves upstream's `Enabled` public endpoint, default deny plus trusted-service bypass, 90-day soft delete and lab purge protection setting. Existing cross-subscription/RG vaults are referenced without settings/tag changes. New optional inputs are trimmed; tags merge caller values with the required `SecurityControl: Ignore`.
+- `add-project` reuses the account-shared tracing connection and accepts `existingAppInsightsResourceId` for project evaluation roles in the component's actual scope. Existing timestamp naming and shared data-RG limitation are documented, not refactored.
+- No upstream portal JSON, stale parameter schema, generated VM/Function artifacts, or network-input overhaul is imported. All 23 tracked tool-server/demo files in the pinned snapshot match locally byte-for-byte. The coordinating comparison against the untouched baseline also confirmed identical copied diagrams and `createCapHost.sh`, `deleteCapHost.sh` and `get-existing-resources.ps1`. These assets remain unchanged: there are no independent tool/demo updates or diagram-regeneration changes to adopt. The only absent demo file is the ignored Function `local.settings.json` developer configuration (upstream uses the local storage emulator), intentionally not imported. Shared upstream preflight/cleanup links do not imply importing those out-of-snapshot tools.
+- Bicep does not upload certificates or set `trustedCertificates`. The private-CA `2026-07-15-preview` API is attributed to the pinned upstream source. The broad Microsoft Learn search did not independently establish feature/API support; neither GA status nor live availability is claimed. Recovery does not restore conversations/file/vector contents; account-host recreation must not affect sibling projects.
+- Repository inspection found no Actions workflows, rulesets or protected-main status checks. The offline validation below was run explicitly; this sync does not add unrelated CI or branch-protection configuration.
+
+**Offline validation:** Baseline 16/16 root templates compiled with Bicep 0.45.15 and no compiler/linter warnings (CLI upgrade notice only). Post-change 17/17 compile via `az bicep build --file ... --stdout`. `python3 -B tests/test_infrastructure_contracts.py -v` passes 32 deterministic tests, including both parameter examples with test-only `az.getSecret` replacement, new/existing vault scopes, feature combinations, five-zone DNS, roles, naming and retained behavior. No live deployment, validation, what-if, host recovery, secret resolution or `test_*_agents_v2.py` execution is part of this sync.

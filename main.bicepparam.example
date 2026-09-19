@@ -1,12 +1,13 @@
 // =============================================================================
 // main.bicepparam.example
-// Copy to ~/workspace/tfvars/foundry-bicep.bicepparam (gitignored) and fill in.
+// Copy to main.bicepparam (gitignored) beside main.bicep and fill in.
+// If storing elsewhere, update the relative `using` path as well.
 //
 // Deploy:
 //   az deployment sub create \
 //     --location australiaeast \
 //     --template-file main.bicep \
-//     --parameters ~/workspace/tfvars/foundry-bicep.bicepparam
+//     --parameters main.bicepparam
 // =============================================================================
 
 using './main.bicep'
@@ -26,6 +27,7 @@ param tags = {
   managedBy: 'bicep'
   owner: 'nthewara'
   costCenter: 'lab'
+  SecurityControl: 'Ignore'
 }
 
 // ----- Networking -----
@@ -39,11 +41,22 @@ param fwSku = 'Basic'
 param bastionProvision = true
 param vmDeploy = true
 // Optional Azure Container Registry (Premium SKU) with private endpoint + AcrPull
-// for the project identity. Synced from upstream sample #19 (PR #519).
+// for the project identity.
 param enableContainerRegistry = true
 // Set to a developer IP CIDR (e.g. '203.0.113.0/26') to allow image push from
 // that range; leave empty to keep ACR private-endpoint-only (public access off).
 param developerIpCidr = ''
+// Default-enabled tracing shares the existing diagnostics LAW. Ingestion is
+// private; authorized public queries remain enabled for evaluations/portal.
+param enableAgentTracing = true
+// Default-enabled private-CA vault. Does NOT upload certificates or register trust.
+// This is separate from the pre-existing vault used for adminPassword below.
+param enableKeyVault = true
+param keyVaultName = ''
+// Same-tenant RBAC vault. Leave empty to create one. Existing configuration is
+// not modified; a private endpoint and account-MI Secrets User are still added.
+param existingKeyVaultResourceId = ''
+// Example: '/subscriptions/<subscription-guid>/resourceGroups/<vault-rg>/providers/Microsoft.KeyVault/vaults/<vault-name>'
 
 // ----- VM -----
 param vmSize = 'Standard_D8s_v5'
@@ -52,15 +65,17 @@ param adminUsername = 'azureadmin'
 // Wire the password from your existing Key Vault.
 // Update the KV resource ID below to match your environment.
 param adminPassword = az.getSecret(
-  /* subscriptionId */ 'b9d87a00-a4d8-47d9-84a2-cfd7a9d745d2',
-  /* resourceGroup  */ 'Management',
-  /* keyVaultName   */ 'USAZE-MSFTINT-PRD-KVLT03',
+  /* subscriptionId */ '<subscription-guid>',
+  /* resourceGroup  */ '<existing-secret-vault-rg>',
+  /* keyVaultName   */ '<existing-secret-vault-name>',
   /* secretName     */ 'foundrybicep-admin-password'
 )
 
 // ----- DNS -----
-// Default 6-zone set is fine for the standard Foundry private-link footprint.
-// Override here if you need to add Fabric or App Configuration zones.
+// Required zones are merged with this array, including zones for enabled
+// features. Defaults produce 12 unique zones; the AMPLS PE maps FIVE zones,
+// reusing the existing Blob zone rather than creating a duplicate.
+// Override here to add extra zones; [] cannot remove required zones.
 // param privateDnsZones = [ ... ]
 
 // ----- Foundry / model -----

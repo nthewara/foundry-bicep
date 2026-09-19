@@ -1,0 +1,11 @@
+.foundry-recovery/
+.venv/
+__pycache__/
+capability-hosts.json
+agents.json
+agent-restore-report.json
+recovery-report.json
+private-ca-trust.json
+arm-*.json
+.recovery-*.tmp
+.*.json.*.tmp
